@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.git/
+.vs/
+.agents/
+Installer/
+*.db
+*.db-shm
+*.db-wal
+NuGet.Config

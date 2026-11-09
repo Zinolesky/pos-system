@@ -1,0 +1,50 @@
+<UserControl x:Class="PosSystem.Frontend.Views.LoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0f172a" Foreground="White" FontFamily="Segoe UI">
+    <Grid>
+        <Border Background="#1e293b" Width="440" CornerRadius="14" Padding="40,36" VerticalAlignment="Center" HorizontalAlignment="Center" BorderBrush="#334155" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="PRIME SUPERMARKET POS" Foreground="#FBBF24" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                <TextBlock Text="Hybrid Cloud &amp; Offline Terminal Sign-In" Foreground="#94a3b8" FontSize="13" HorizontalAlignment="Center" Margin="0,0,0,28"/>
+
+                <TextBlock Text="USERNAME" Foreground="#94a3b8" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
+                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" CaretBrush="#FBBF24" BorderBrush="#334155" BorderThickness="1" Height="44" FontSize="16" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,0,18">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding LoginCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+
+                <TextBlock Text="SECURE PIN" Foreground="#94a3b8" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
+                <PasswordBox Name="PinBox" Background="#0f172a" Foreground="White" CaretBrush="#FBBF24" BorderBrush="#334155" BorderThickness="1" Height="44" FontSize="16" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,0,14">
+                    <PasswordBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding LoginCommand}"/>
+                    </PasswordBox.InputBindings>
+                </PasswordBox>
+
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#f87171" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                <Button Content="SIGN IN TO TERMINAL  →" Command="{Binding LoginCommand}" Background="#FBBF24" Foreground="#090C15" FontWeight="Bold" FontSize="15" Height="48" BorderThickness="0" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Border Background="#0f172a" CornerRadius="8" Padding="12" Margin="0,24,0,0" BorderBrush="#334155" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="QUICK DEMO PROFILES (OFFLINE-READY)" Foreground="#94a3b8" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <UniformGrid Columns="3">
+                            <Button Content="Admin (1234)" Command="{Binding QuickFillCommand}" CommandParameter="admin" Background="#1e293b" Foreground="#FBBF24" BorderBrush="#334155" BorderThickness="1" Margin="3" Padding="6,6" FontSize="11" Cursor="Hand"/>
+                            <Button Content="Manager (2222)" Command="{Binding QuickFillCommand}" CommandParameter="manager" Background="#1e293b" Foreground="#38bdf8" BorderBrush="#334155" BorderThickness="1" Margin="3" Padding="6,6" FontSize="11" Cursor="Hand"/>
+                            <Button Content="Cashier (0000)" Command="{Binding QuickFillCommand}" CommandParameter="cashier" Background="#1e293b" Foreground="#4ade80" BorderBrush="#334155" BorderThickness="1" Margin="3" Padding="6,6" FontSize="11" Cursor="Hand"/>
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
