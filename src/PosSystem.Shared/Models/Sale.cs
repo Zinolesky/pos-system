@@ -47,6 +47,7 @@ public class Sale
     public decimal Subtotal { get; set; }
     public decimal DiscountPercentage { get; set; }
     public decimal DiscountAmount { get; set; }
+    public int LoyaltyPointsRedeemed { get; set; }
     public decimal TaxRatePercentage { get; set; } = 0.075m;
     public bool IsTaxInclusive { get; set; }
     public decimal TaxAmount { get; set; }
@@ -57,6 +58,7 @@ public class Sale
     public decimal CashTendered { get; set; }
     public decimal CardTendered { get; set; }
     public decimal TransferTendered { get; set; }
+    public decimal StoreCreditTendered { get; set; }
     public decimal AmountTendered { get; set; }
     public decimal ChangeDue { get; set; }
     public string? PaymentReference { get; set; }

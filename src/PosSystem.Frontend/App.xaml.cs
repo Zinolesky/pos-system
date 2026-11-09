@@ -1,9 +1,11 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Markup;
+using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -28,6 +30,8 @@ public partial class App : Application
             typeof(FrameworkElement),
             new FrameworkPropertyMetadata(XmlLanguage.GetLanguage(culture.IetfLanguageTag)));
 
+        RegisterGlobalCrashShield();
+
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((_, services) =>
             {
@@ -41,6 +45,7 @@ public partial class App : Application
                 services.AddSingleton<INavigationService, NavigationService>();
                 services.AddSingleton<AuthenticationService>();
                 services.AddSingleton<CartExecutionEngine>();
+                services.AddSingleton<DatabaseMaintenanceService>();
 
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainViewModel>();
@@ -58,6 +63,48 @@ public partial class App : Application
 #if MANUAL_XAML_LOADER
         Startup += OnStartup;
 #endif
+    }
+
+    private void RegisterGlobalCrashShield()
+    {
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+                WriteCrashLog("AppDomainUnhandledException", ex);
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            WriteCrashLog("UnobservedTaskException", args.Exception);
+            args.SetObserved();
+        };
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        WriteCrashLog("DispatcherUnhandledException", e.Exception);
+        e.Handled = true;
+    }
+
+    public static string WriteCrashLog(string source, Exception exception)
+    {
+        try
+        {
+            string logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "PosSystem",
+                "Logs");
+            Directory.CreateDirectory(logDir);
+
+            string logFile = Path.Combine(logDir, $"pos_error_{DateTime.UtcNow:yyyyMMdd}.log");
+            string entry = $"[{DateTime.UtcNow:O}] [{source}] {exception.GetType().FullName}: {exception.Message}{Environment.NewLine}{exception.StackTrace}{Environment.NewLine}--------------------------------------------------{Environment.NewLine}";
+            File.AppendAllText(logFile, entry);
+            return logFile;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
 #if MANUAL_XAML_LOADER
@@ -89,8 +136,9 @@ public partial class App : Application
             {
                 navService.NavigateTo<CheckoutViewModel>();
             }
-            catch
+            catch (Exception ex)
             {
+                WriteCrashLog("StartupSessionRestore", ex);
                 sessionService.Logout();
                 navService.NavigateTo<LoginViewModel>();
             }

@@ -415,8 +415,11 @@
                     <Grid Margin="0,0,0,12">
                         <TextBlock Text="Back-Office Administration &amp; Inventory Control" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="{Binding InventoryPolicyButtonText}" Background="#1e293b" Foreground="#38bdf8" BorderBrush="#334155" BorderThickness="1" Padding="12,6" Margin="0,0,8,0" Command="{Binding CycleInventoryPolicyCommand}"/>
-                            <Button Content="Toggle VAT Inclusive / Exclusive" Background="#334155" Foreground="#FBBF24" Padding="12,6" BorderThickness="0" Command="{Binding ToggleTaxInclusiveCommand}"/>
+                            <Button Content="💾 Backup DB" Background="#166534" Foreground="White" Padding="10,6" Margin="0,0,6,0" BorderThickness="0" Command="{Binding BackupDatabaseCommand}"/>
+                            <Button Content="📊 Export CSV" Background="#0369a1" Foreground="White" Padding="10,6" Margin="0,0,6,0" BorderThickness="0" Command="{Binding ExportCsvReportsCommand}"/>
+                            <Button Content="📥 Import CSV" Background="#334155" Foreground="#4ade80" Padding="10,6" Margin="0,0,6,0" BorderThickness="0" Command="{Binding ImportCsvCatalogCommand}"/>
+                            <Button Content="{Binding InventoryPolicyButtonText}" Background="#1e293b" Foreground="#38bdf8" BorderBrush="#334155" BorderThickness="1" Padding="10,6" Margin="0,0,6,0" Command="{Binding CycleInventoryPolicyCommand}"/>
+                            <Button Content="Toggle VAT Inclusive / Exclusive" Background="#334155" Foreground="#FBBF24" Padding="10,6" BorderThickness="0" Command="{Binding ToggleTaxInclusiveCommand}"/>
                         </StackPanel>
                     </Grid>
 
@@ -512,7 +515,11 @@
                                 </StackPanel>
                             </UniformGrid>
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                <CheckBox Content="Taxable (7.5% VAT)" IsChecked="{Binding EditableProduct.IsTaxable}" Foreground="White" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                                <CheckBox Content="Taxable (7.5% VAT)" IsChecked="{Binding EditableProduct.IsTaxable}" Foreground="White" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                <TextBlock Text="Wholesale Min Qty:" Foreground="#94a3b8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBox Text="{Binding EditableProduct.WholesaleMinQty, UpdateSourceTrigger=PropertyChanged}" Width="60" Background="#0f172a" Foreground="White" Height="30" Padding="6,4" Margin="0,0,14,0"/>
+                                <TextBlock Text="Wholesale Price:" Foreground="#94a3b8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBox Text="{Binding EditableProduct.WholesaleUnitPrice, UpdateSourceTrigger=PropertyChanged}" Width="90" Background="#0f172a" Foreground="White" Height="30" Padding="6,4" Margin="0,0,16,0"/>
                                 <Button Content="Save Product to Catalog" Style="{StaticResource GoldButton}" Command="{Binding SaveProductCommand}"/>
                             </StackPanel>
                         </StackPanel>
@@ -737,14 +744,20 @@
                         <TextBlock Text="{Binding TotalText}" FontSize="24" FontWeight="Bold" Foreground="White" HorizontalAlignment="Right"/>
                     </Grid>
 
-                    <UniformGrid Columns="4" Margin="0,0,0,14">
-                        <Button Content="💵 Cash" Margin="3" Padding="8,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="Cash"/>
-                        <Button Content="💳 POS Card" Margin="3" Padding="8,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="Card"/>
-                        <Button Content="🏦 Transfer" Margin="3" Padding="8,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="BankTransfer"/>
-                        <Button Content="⚡ Split Pay" Margin="3" Padding="8,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="Split"/>
+                    <UniformGrid Columns="5" Margin="0,0,0,10">
+                        <Button Content="💵 Cash" Margin="2" Padding="6,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="Cash"/>
+                        <Button Content="💳 POS Card" Margin="2" Padding="6,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="Card"/>
+                        <Button Content="🏦 Transfer" Margin="2" Padding="6,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="BankTransfer"/>
+                        <Button Content="🎁 Store Credit" Margin="2" Padding="6,10" Background="#334155" Foreground="#4ade80" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="StoreCredit"/>
+                        <Button Content="⚡ Split Pay" Margin="2" Padding="6,10" Background="#334155" Foreground="White" BorderThickness="0" Command="{Binding SelectPaymentMethodCommand}" CommandParameter="Split"/>
                     </UniformGrid>
 
-                    <UniformGrid Columns="5" Margin="0,0,0,14">
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="{Binding AttachedCustomerText}" Foreground="#38bdf8" FontSize="12" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <Button Content="🎁 Redeem Loyalty Points (1 pt = ₦10)" HorizontalAlignment="Right" Padding="10,5" Background="#166534" Foreground="#4ade80" BorderThickness="0" FontSize="11" FontWeight="SemiBold" Command="{Binding RedeemLoyaltyPointsCommand}"/>
+                    </Grid>
+
+                    <UniformGrid Columns="5" Margin="0,0,0,12">
                         <Button Content="Exact" Margin="2" Padding="6" Background="#0f172a" Foreground="#FBBF24" BorderThickness="0" Command="{Binding QuickCashDenomCommand}" CommandParameter="0"/>
                         <Button Content="₦2,000" Margin="2" Padding="6" Background="#0f172a" Foreground="White" BorderThickness="0" Command="{Binding QuickCashDenomCommand}" CommandParameter="2000"/>
                         <Button Content="₦5,000" Margin="2" Padding="6" Background="#0f172a" Foreground="White" BorderThickness="0" Command="{Binding QuickCashDenomCommand}" CommandParameter="5000"/>
@@ -752,18 +765,22 @@
                         <Button Content="₦20,000" Margin="2" Padding="6" Background="#0f172a" Foreground="White" BorderThickness="0" Command="{Binding QuickCashDenomCommand}" CommandParameter="20000"/>
                     </UniformGrid>
 
-                    <UniformGrid Columns="3" Margin="0,0,0,12">
-                        <StackPanel Margin="0,0,8,0">
+                    <UniformGrid Columns="4" Margin="0,0,0,12">
+                        <StackPanel Margin="0,0,6,0">
                             <TextBlock Text="Cash Tendered" Foreground="#94a3b8" FontSize="11"/>
-                            <TextBox Text="{Binding CashTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" Height="36" FontSize="15" Padding="8,6"/>
+                            <TextBox Text="{Binding CashTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" Height="36" FontSize="14" Padding="6"/>
                         </StackPanel>
-                        <StackPanel Margin="4,0">
+                        <StackPanel Margin="3,0">
                             <TextBlock Text="POS Card Amount" Foreground="#94a3b8" FontSize="11"/>
-                            <TextBox Text="{Binding CardTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" Height="36" FontSize="15" Padding="8,6"/>
+                            <TextBox Text="{Binding CardTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" Height="36" FontSize="14" Padding="6"/>
                         </StackPanel>
-                        <StackPanel Margin="8,0,0,0">
-                            <TextBlock Text="Bank Transfer Amount" Foreground="#94a3b8" FontSize="11"/>
-                            <TextBox Text="{Binding TransferTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" Height="36" FontSize="15" Padding="8,6"/>
+                        <StackPanel Margin="3,0">
+                            <TextBlock Text="Bank Transfer" Foreground="#94a3b8" FontSize="11"/>
+                            <TextBox Text="{Binding TransferTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="White" Height="36" FontSize="14" Padding="6"/>
+                        </StackPanel>
+                        <StackPanel Margin="6,0,0,0">
+                            <TextBlock Text="Store Credit" Foreground="#4ade80" FontSize="11"/>
+                            <TextBox Text="{Binding StoreCreditTenderInput, UpdateSourceTrigger=PropertyChanged}" Background="#0f172a" Foreground="#4ade80" Height="36" FontSize="14" Padding="6"/>
                         </StackPanel>
                     </UniformGrid>
 

@@ -48,15 +48,32 @@ public partial class MainWindow : Window
 
         if (DataContext is MainViewModel mainVm && mainVm.CurrentViewModel is CheckoutViewModel checkoutVm)
         {
-            if (e.Key == Key.F12)
+            switch (e.Key)
             {
-                checkoutVm.PayCommand.Execute(null);
-                e.Handled = true;
-            }
-            else if (e.Key == Key.F4)
-            {
-                checkoutVm.HoldOrRecallSaleCommand.Execute(null);
-                e.Handled = true;
+                case Key.F2:
+                    checkoutVm.ActiveSection = "Register";
+                    e.Handled = true;
+                    break;
+                case Key.F4:
+                    checkoutVm.HoldOrRecallSaleCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+                case Key.F5:
+                    checkoutVm.QuickExactCashCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+                case Key.F8:
+                    checkoutVm.ActiveSection = "Customers";
+                    e.Handled = true;
+                    break;
+                case Key.F9:
+                    checkoutVm.LockStationCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+                case Key.F12:
+                    checkoutVm.PayCommand.Execute(null);
+                    e.Handled = true;
+                    break;
             }
         }
     }

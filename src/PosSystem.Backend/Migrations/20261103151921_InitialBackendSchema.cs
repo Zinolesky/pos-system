@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -121,6 +121,7 @@ namespace PosSystem.Backend.Migrations
                     subtotal = table.Column<decimal>(type: "numeric", nullable: false),
                     discount_percentage = table.Column<decimal>(type: "numeric", nullable: false),
                     discount_amount = table.Column<decimal>(type: "numeric", nullable: false),
+                    loyalty_points_redeemed = table.Column<int>(type: "integer", nullable: false),
                     tax_rate_percentage = table.Column<decimal>(type: "numeric", nullable: false),
                     is_tax_inclusive = table.Column<bool>(type: "boolean", nullable: false),
                     tax_amount = table.Column<decimal>(type: "numeric", nullable: false),
@@ -130,6 +131,7 @@ namespace PosSystem.Backend.Migrations
                     cash_tendered = table.Column<decimal>(type: "numeric", nullable: false),
                     card_tendered = table.Column<decimal>(type: "numeric", nullable: false),
                     transfer_tendered = table.Column<decimal>(type: "numeric", nullable: false),
+                    store_credit_tendered = table.Column<decimal>(type: "numeric", nullable: false),
                     amount_tendered = table.Column<decimal>(type: "numeric", nullable: false),
                     change_due = table.Column<decimal>(type: "numeric", nullable: false),
                     payment_reference = table.Column<string>(type: "text", nullable: true),
@@ -212,6 +214,9 @@ namespace PosSystem.Backend.Migrations
                     unit = table.Column<string>(type: "text", nullable: false),
                     cost_price = table.Column<decimal>(type: "numeric", nullable: false),
                     price = table.Column<decimal>(type: "numeric", nullable: false),
+                    wholesale_min_qty = table.Column<int>(type: "integer", nullable: false),
+                    wholesale_unit_price = table.Column<decimal>(type: "numeric", nullable: false),
+                    expiry_date = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     is_taxable = table.Column<bool>(type: "boolean", nullable: false),
                     image_url = table.Column<string>(type: "text", nullable: true),
                     stock = table.Column<int>(type: "integer", nullable: false),

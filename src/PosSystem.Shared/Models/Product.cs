@@ -23,6 +23,10 @@ public class Product
     public decimal CostPrice { get; set; }
     public decimal Price { get; set; }
 
+    public int WholesaleMinQty { get; set; }
+    public decimal WholesaleUnitPrice { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+
     public bool IsTaxable { get; set; } = true;
     public string? ImageUrl { get; set; }
 
@@ -38,11 +42,24 @@ public class Product
     public bool IsOutOfStock => Stock <= 0;
 
     [JsonIgnore]
-    public string StockBadgeText => Stock < 0
-        ? $"NEG: {Stock} {Unit}"
-        : Stock == 0
-            ? "OUT OF STOCK"
-            : Stock <= ReorderLevel
-                ? $"Low: {Stock} {Unit}"
-                : $"{Stock} in stock";
+    public bool IsExpired => ExpiryDate.HasValue && ExpiryDate.Value.Date < DateTime.UtcNow.Date;
+
+    [JsonIgnore]
+    public bool IsExpiringSoon =>
+        ExpiryDate.HasValue &&
+        !IsExpired &&
+        (ExpiryDate.Value.Date - DateTime.UtcNow.Date).TotalDays <= 7;
+
+    [JsonIgnore]
+    public string StockBadgeText => IsExpired
+        ? $"EXPIRED ({Stock} {Unit})"
+        : IsExpiringSoon
+            ? $"EXP {(int)Math.Max(0, (ExpiryDate!.Value.Date - DateTime.UtcNow.Date).TotalDays)}d ({Stock})"
+            : Stock < 0
+                ? $"NEG: {Stock} {Unit}"
+                : Stock == 0
+                    ? "OUT OF STOCK"
+                    : Stock <= ReorderLevel
+                        ? $"Low: {Stock} {Unit}"
+                        : $"{Stock} in stock";
 }

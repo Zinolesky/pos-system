@@ -7,8 +7,8 @@ $env:DOTNET_ROOT = "C:\Program Files\dotnet"
 $env:NUGET_PACKAGES = "D:\Users\.nuget\packages"
 $env:PATH = "C:\Program Files\dotnet;$env:PATH"
 
-Write-Host "1. Publishing self-contained win-x64 release for PosSystem.Frontend..." -ForegroundColor Cyan
-& $dotnetExe publish "$PSScriptRoot\src\PosSystem.Frontend\PosSystem.Frontend.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false
+Write-Host "1. Publishing self-contained win-x64 release (ReadyToRun native codegen) for PosSystem.Frontend..." -ForegroundColor Cyan
+& $dotnetExe publish "$PSScriptRoot\src\PosSystem.Frontend\PosSystem.Frontend.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishReadyToRun=true
 
 $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if (Test-Path $isccPath) {

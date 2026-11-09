@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 using PosSystem.Shared.Serialization;
 
@@ -35,6 +36,22 @@ public class SaleLineItem
 
     [JsonIgnore]
     public bool IsNegativeStockAuthorized { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public decimal StandardRetailPrice { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public int WholesaleMinQty { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public decimal WholesaleUnitPrice { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public bool IsManualPriceOverride { get; set; }
 
     [JsonIgnore]
     public int RemainingReturnableQuantity => Math.Max(0, Quantity - ReturnedQuantity);

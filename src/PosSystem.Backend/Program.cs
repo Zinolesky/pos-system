@@ -238,7 +238,13 @@ app.MapPost("/api/v1/sync/sales", [Authorize] async (List<Sale> sales, BackendDb
                 {
                     customer.TotalSpent += sale.TotalAmount;
                     customer.VisitCount += 1;
-                    customer.LoyaltyPoints += (int)Math.Floor(sale.TotalAmount / 1000m);
+                    int redeemedPts = Math.Clamp(sale.LoyaltyPointsRedeemed, 0, customer.LoyaltyPoints);
+                    int earnedPts = (int)Math.Floor(sale.TotalAmount / 1000m);
+                    customer.LoyaltyPoints = Math.Max(0, customer.LoyaltyPoints - redeemedPts) + earnedPts;
+                    if (sale.StoreCreditTendered > 0m)
+                    {
+                        customer.StoreCreditBalance = Math.Max(0m, customer.StoreCreditBalance - sale.StoreCreditTendered);
+                    }
                     customer.UpdatedAt = DateTime.UtcNow;
                 }
                 else if (isReturnSlip)
@@ -266,13 +272,15 @@ app.MapPost("/api/v1/sync/sales", [Authorize] async (List<Sale> sales, BackendDb
     });
 }).WithName("SyncSales");
 
-// BIDIRECTIONAL OPERATIONS SYNC (CUSTOMERS, SHIFTS, AUDIT LOGS, STORE SETTINGS)
+// BIDIRECTIONAL OPERATIONS SYNC (CUSTOMERS, SHIFTS, AUDIT LOGS, STORE SETTINGS, CATALOG)
 app.MapPost("/api/v1/sync/operations", [Authorize] async (SyncOperationsRequest req, BackendDbContext db) =>
 {
     int syncedCustomers = 0;
     int syncedShifts = 0;
     int syncedAudits = 0;
     int syncedSettings = 0;
+    int syncedCategories = 0;
+    int syncedProducts = 0;
 
     await using var tx = await db.Database.BeginTransactionAsync();
 
@@ -289,7 +297,7 @@ app.MapPost("/api/v1/sync/operations", [Authorize] async (SyncOperationsRequest 
             existing.Name = customer.Name;
             existing.Phone = customer.Phone;
             existing.Email = customer.Email;
-            existing.LoyaltyPoints = Math.Max(existing.LoyaltyPoints, customer.LoyaltyPoints);
+            existing.LoyaltyPoints = customer.LoyaltyPoints;
             existing.StoreCreditBalance = customer.StoreCreditBalance;
             existing.TotalSpent = Math.Max(existing.TotalSpent, customer.TotalSpent);
             existing.VisitCount = Math.Max(existing.VisitCount, customer.VisitCount);
@@ -351,6 +359,54 @@ app.MapPost("/api/v1/sync/operations", [Authorize] async (SyncOperationsRequest 
         }
     }
 
+    foreach (var cat in req.Categories)
+    {
+        var existing = await db.Categories.FirstOrDefaultAsync(c => c.Id == cat.Id);
+        if (existing == null)
+        {
+            db.Categories.Add(cat);
+            syncedCategories++;
+        }
+        else if (cat.UpdatedAt >= existing.UpdatedAt)
+        {
+            existing.Name = cat.Name;
+            existing.Description = cat.Description;
+            existing.ColorHex = cat.ColorHex;
+            existing.IsActive = cat.IsActive;
+            existing.UpdatedAt = cat.UpdatedAt;
+            syncedCategories++;
+        }
+    }
+
+    foreach (var prod in req.Products)
+    {
+        var existing = await db.Products.FirstOrDefaultAsync(p => p.Id == prod.Id || p.Sku == prod.Sku);
+        if (existing == null)
+        {
+            db.Products.Add(prod);
+            syncedProducts++;
+        }
+        else if (prod.UpdatedAt >= existing.UpdatedAt)
+        {
+            existing.CategoryId = prod.CategoryId;
+            existing.Name = prod.Name;
+            existing.Sku = prod.Sku;
+            existing.Barcode = prod.Barcode;
+            existing.Unit = prod.Unit;
+            existing.CostPrice = prod.CostPrice;
+            existing.Price = prod.Price;
+            existing.WholesaleMinQty = prod.WholesaleMinQty;
+            existing.WholesaleUnitPrice = prod.WholesaleUnitPrice;
+            existing.ExpiryDate = prod.ExpiryDate;
+            existing.IsTaxable = prod.IsTaxable;
+            existing.Stock = prod.Stock;
+            existing.ReorderLevel = prod.ReorderLevel;
+            existing.IsActive = prod.IsActive;
+            existing.UpdatedAt = prod.UpdatedAt;
+            syncedProducts++;
+        }
+    }
+
     await db.SaveChangesAsync();
     await tx.CommitAsync();
 
@@ -360,6 +416,8 @@ app.MapPost("/api/v1/sync/operations", [Authorize] async (SyncOperationsRequest 
         SyncedShifts = syncedShifts,
         SyncedAuditLogs = syncedAudits,
         SyncedSettings = syncedSettings,
+        SyncedCategories = syncedCategories,
+        SyncedProducts = syncedProducts,
         ServerTimeUtc = DateTime.UtcNow
     });
 }).WithName("SyncOperations");

@@ -42,7 +42,7 @@ public static class Program
             }
         }
 
-        Console.WriteLine("=== Prime POS v2.1 Enterprise Automated Verification Suite ===");
+        Console.WriteLine("=== Prime POS v2.2 Enterprise Automated Verification Suite ===");
 
         RunTest("1. Argon2id PasswordHasher hashes and verifies PINs accurately", () =>
         {
@@ -564,6 +564,188 @@ public static class Program
                 $"100 tab switches + 50 catalog filters expected < 150ms, took {sw.ElapsedMilliseconds}ms");
         });
 
+        RunTest("17. Zero-Downtime SQLite Hot Backup (VACUUM INTO) & CSV Reports Export / Supplier Catalog Import roundtrip", () =>
+        {
+            using var harness = new PosTestHarness();
+            harness.LoginAsAdmin();
+            using var vm = harness.CreateCheckoutViewModel();
+
+            // 1. Hot Backup via VACUUM INTO
+            var backup = vm.RunHotBackup();
+            Assert(backup.Success && File.Exists(backup.BackupFilePath), "Hot backup .db snapshot must exist on disk");
+            Assert(backup.FileSizeBytes > 4096, $"Backup size must be > 4KB, got {backup.FileSizeBytes}");
+
+            // Clean up test backup file so we don't pollute user backups
+            try { File.Delete(backup.BackupFilePath); } catch { }
+
+            // 2. One-click CSV Reports Export (4 CSV files)
+            var exportRes = vm.ExportCsvReports();
+            Assert(exportRes.Success && exportRes.FilesExported == 4, $"Expected 4 exported CSV reports, got {exportRes.FilesExported}");
+            Assert(exportRes.TotalRowsExported >= 12, $"Expected >= 12 exported rows, got {exportRes.TotalRowsExported}");
+
+            // 3. Bulk CSV Supplier Catalog Import (Insert + Upsert with Wholesale & Expiry)
+            string tempCsv = Path.Combine(Path.GetTempPath(), $"pos_import_test_{Guid.NewGuid():N}.csv");
+            File.WriteAllLines(tempCsv, new[]
+            {
+                "Sku,Name,Barcode,CategoryName,Unit,CostPrice,Price,WholesaleMinQty,WholesaleUnitPrice,Stock,ReorderLevel,IsTaxable,ExpiryDate",
+                "IMP-9001,Imported Olive Oil (1L),6159900090011,Pantry & Dry Goods,btl,6200,8500,6,7800,35,8,true,2027-06-30",
+                "PRD-1001,Organic Bananas (1kg Bunch),6151100010018,Fresh Produce & Fruit,kg,950,1550,10,1250,90,15,false,2026-11-12"
+            });
+
+            var maint = harness.GetMaintenanceService();
+            var importRes = maint.ImportProductsFromCsv(tempCsv);
+            try { File.Delete(tempCsv); } catch { }
+
+            Assert(importRes.Success && importRes.CreatedCount == 1, $"Expected 1 created product, got {importRes.CreatedCount} ({importRes.Message})");
+            Assert(importRes.UpdatedCount == 1, $"Expected 1 updated product, got {importRes.UpdatedCount}");
+
+            using var db = harness.CreateDbContext();
+            var olive = db.Products.FirstOrDefault(p => p.Sku == "IMP-9001");
+            Assert(olive != null && olive.Price == 8500m && olive.WholesaleMinQty == 6 && olive.WholesaleUnitPrice == 7800m,
+                "Imported SKU IMP-9001 must persist with wholesale tier pricing");
+            var bananas = db.Products.First(p => p.Sku == "PRD-1001");
+            Assert(bananas.Price == 1550m && bananas.WholesaleUnitPrice == 1250m && bananas.Stock == 90,
+                "Updated SKU PRD-1001 must reflect CSV price, wholesale price, and stock");
+        });
+
+        RunTest("18. Customer Loyalty Points Redemption (1 pt = ₦10) & Store Credit Tender at Checkout and Refund", () =>
+        {
+            using var harness = new PosTestHarness();
+            var admin = harness.LoginAsAdmin();
+            using var vm = harness.CreateCheckoutViewModel();
+
+            vm.OpeningFloatInput = 20000m;
+            vm.OpenShift();
+
+            Customer testCust;
+            using (var db = harness.CreateDbContext())
+            {
+                testCust = new Customer
+                {
+                    Id = Ulid.NewUlid(),
+                    Name = "Chinedu Okafor",
+                    Phone = "08030009988",
+                    LoyaltyPoints = 100, // Worth ₦1,000 discount
+                    StoreCreditBalance = 5000m
+                };
+                db.Customers.Add(testCust);
+                db.SaveChanges();
+            }
+
+            vm.LoadDatabaseData();
+            vm.AttachCustomerCommand.Execute(vm.Customers.First(c => c.Id == testCust.Id));
+
+            // Add non-taxable item: PRD-1001 Organic Bananas @ 1,500 x 4 = 6,000
+            var bananas = vm.FilteredProducts.First(p => p.Sku == "PRD-1001");
+            vm.AddProductWithQuantity(bananas, 4);
+            Assert(vm.CurrentSale.Subtotal == 6000m, $"Expected subtotal 6000, got {vm.CurrentSale.Subtotal}");
+
+            // Redeem 100 loyalty points -> -₦1,000 discount -> Total becomes ₦5,000
+            vm.RedeemCustomerLoyaltyPoints();
+            Assert(vm.CurrentSale.LoyaltyPointsRedeemed == 100, $"Expected 100 points redeemed, got {vm.CurrentSale.LoyaltyPointsRedeemed}");
+            Assert(vm.CurrentSale.DiscountAmount == 1000m, $"Expected 1000 loyalty discount, got {vm.CurrentSale.DiscountAmount}");
+            Assert(vm.CurrentSale.TotalAmount == 5000m, $"Expected total 5000 after loyalty redemption, got {vm.CurrentSale.TotalAmount}");
+
+            // Pay ₦3,000 with Store Credit + ₦2,000 with Cash
+            vm.SelectedPaymentMethod = PaymentMethod.StoreCredit;
+            vm.StoreCreditTenderInput = 3000m;
+            vm.CashTenderInput = 2000m;
+
+            Ulid completedSaleId = vm.CurrentSale.Id;
+            Assert(vm.FinalizeSalePaymentAsync().GetAwaiter().GetResult(), "Sale with Loyalty Points + Store Credit must succeed");
+
+            using (var db = harness.CreateDbContext())
+            {
+                var updatedCust = db.Customers.First(c => c.Id == testCust.Id);
+                // 100 pts - 100 redeemed + 5 earned (on ₦5,000 sale) = 5 pts
+                Assert(updatedCust.LoyaltyPoints == 5, $"Expected 5 remaining+earned loyalty points, got {updatedCust.LoyaltyPoints}");
+                // ₦5,000 credit - ₦3,000 tendered = ₦2,000 remaining
+                Assert(updatedCust.StoreCreditBalance == 2000m, $"Expected 2000 remaining StoreCreditBalance, got {updatedCust.StoreCreditBalance}");
+            }
+
+            // Refund 2 units (₦2,500) -> must restore Store Credit balance to customer
+            Sale savedSale;
+            using (var db = harness.CreateDbContext())
+            {
+                savedSale = db.Sales.Include(s => s.Items).First(s => s.Id == completedSaleId);
+            }
+            var retSlip = vm.ExecuteApprovedRefund(
+                completedSaleId,
+                new Dictionary<Ulid, int> { [savedSale.Items[0].Id] = 2 },
+                admin);
+            Assert(retSlip != null && retSlip.TotalAmount == 2500m, "Partial refund on loyalty/store-credit sale must succeed");
+
+            using (var db = harness.CreateDbContext())
+            {
+                var custAfterRefund = db.Customers.First(c => c.Id == testCust.Id);
+                Assert(custAfterRefund.StoreCreditBalance == 4500m, $"Expected StoreCreditBalance restored to 4500, got {custAfterRefund.StoreCreditBalance}");
+            }
+        });
+
+        RunTest("19. Wholesale / Case-Pack Tiered Pricing auto-applies at threshold quantity & Perishable Expiry Badges trigger accurately", () =>
+        {
+            var engine = new CartExecutionEngine();
+            var vat = new TaxRate { Name = "VAT", Percentage = 0.075m, IsInclusive = false };
+            var sale = new Sale();
+
+            // BEV-1007 Fresh Squeezed Orange Juice: Retail 3,200, Wholesale (6+ pack) 2,850
+            var juice = CatalogSeedData.GetDefaultProducts().First(p => p.Sku == "BEV-1007");
+            Assert(juice.WholesaleMinQty == 6 && juice.WholesaleUnitPrice == 2850m, "Seed data must configure 6-pack wholesale tier on BEV-1007");
+
+            engine.AddItemToCart(sale, juice, 2, vat);
+            Assert(sale.Items[0].UnitPrice == 3200m, $"Qty 2 should use retail price 3200, got {sale.Items[0].UnitPrice}");
+
+            // Increase quantity to 6 -> must automatically switch to wholesale unit price 2,850
+            engine.UpdateItemQuantity(sale, sale.Items[0], 6, vat);
+            Assert(sale.Items[0].UnitPrice == 2850m, $"Qty 6 should auto-apply wholesale price 2850, got {sale.Items[0].UnitPrice}");
+            Assert(sale.Items[0].LineSubtotal == 17100m, $"6 * 2850 expected 17100, got {sale.Items[0].LineSubtotal}");
+
+            // Decrease quantity back to 3 -> must revert to standard retail price 3,200
+            engine.UpdateItemQuantity(sale, sale.Items[0], 3, vat);
+            Assert(sale.Items[0].UnitPrice == 3200m, $"Qty 3 should revert to retail price 3200, got {sale.Items[0].UnitPrice}");
+
+            // Perishable Expiry Badge checks
+            var expiredItem = new Product { Name = "Yogurt", Stock = 12, ReorderLevel = 5, ExpiryDate = DateTime.UtcNow.Date.AddDays(-1) };
+            Assert(expiredItem.IsExpired && expiredItem.StockBadgeText.StartsWith("EXPIRED"), $"Expected EXPIRED badge, got {expiredItem.StockBadgeText}");
+
+            var expiringSoonItem = new Product { Name = "Milk", Stock = 15, ReorderLevel = 5, ExpiryDate = DateTime.UtcNow.Date.AddDays(3) };
+            Assert(expiringSoonItem.IsExpiringSoon && expiringSoonItem.StockBadgeText.StartsWith("EXP 3d"), $"Expected EXP 3d badge, got {expiringSoonItem.StockBadgeText}");
+        });
+
+        RunTest("20. Multi-Terminal Catalog Sync Payload, Global Crash Logger, & PostgreSQL v2.2 Schema DDL verification", () =>
+        {
+            // 1. Verify SyncOperationsRequest carries Categories and Products cleanly
+            var req = new SyncOperationsRequest
+            {
+                Categories = CatalogSeedData.GetDefaultCategories().Take(2).ToList(),
+                Products = CatalogSeedData.GetDefaultProducts().Take(3).ToList()
+            };
+            string json = JsonSerializer.Serialize(req, PosJsonOptions.Default);
+            var roundtrip = JsonSerializer.Deserialize<SyncOperationsRequest>(json, PosJsonOptions.Default);
+            Assert(roundtrip != null && roundtrip.Categories.Count == 2 && roundtrip.Products.Count == 3,
+                "SyncOperationsRequest must roundtrip Categories and Products for multi-terminal sync");
+            Assert(roundtrip!.Products.Any(p => p.WholesaleMinQty > 0), "Synced Products must preserve WholesaleMinQty");
+
+            // 2. Verify Global Crash Shield Logger writes to %LocalAppData%\PosSystem\Logs
+            PosSystem.Frontend.App.WriteCrashLog("UnitTestProbe", new InvalidOperationException("Simulated test exception"));
+            string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PosSystem", "Logs");
+            string todayLog = Path.Combine(logDir, $"pos_error_{DateTime.UtcNow:yyyyMMdd}.log");
+            Assert(File.Exists(todayLog), "App.WriteCrashLog must create daily diagnostic log file");
+
+            // 3. Verify PostgreSQL DDL includes v2.2 columns
+            using var backendDb = new BackendDesignTimeDbContextFactory().CreateDbContext(Array.Empty<string>());
+            string ddl = backendDb.Database.GenerateCreateScript();
+            string[] v22Columns =
+            {
+                "wholesale_min_qty", "wholesale_unit_price", "expiry_date",
+                "loyalty_points_redeemed", "store_credit_tendered"
+            };
+            foreach (var col in v22Columns)
+            {
+                Assert(ddl.Contains(col, StringComparison.OrdinalIgnoreCase), $"PostgreSQL DDL must include v2.2 column '{col}'");
+            }
+        });
+
         Console.WriteLine($"=== Results: {passed} Passed, {failed} Failed ===");
         return failed == 0 ? 0 : 1;
     }
@@ -602,6 +784,7 @@ public static class Program
             services.AddSingleton<CartExecutionEngine>();
             services.AddSingleton<ReceiptPrinterService>();
             services.AddSingleton<BarcodeScannerListener>();
+            services.AddSingleton<DatabaseMaintenanceService>();
             services.AddTransient<CheckoutViewModel>();
             services.AddHttpClient();
 
@@ -640,6 +823,9 @@ public static class Program
 
         public AuthenticationService GetAuthenticationService()
             => _serviceProvider.GetRequiredService<AuthenticationService>();
+
+        public DatabaseMaintenanceService GetMaintenanceService()
+            => _serviceProvider.GetRequiredService<DatabaseMaintenanceService>();
 
         public void Dispose()
         {

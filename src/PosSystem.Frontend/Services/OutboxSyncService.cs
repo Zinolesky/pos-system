@@ -248,17 +248,23 @@ public class OutboxSyncService : BackgroundService
 
         var customersQuery = db.Customers.AsNoTracking().AsQueryable();
         var settingsQuery = db.StoreSettings.AsNoTracking().AsQueryable();
+        var categoriesQuery = db.Categories.AsNoTracking().AsQueryable();
+        var productsQuery = db.Products.AsNoTracking().AsQueryable();
         if (_lastOperationsSyncUtc.HasValue)
         {
             customersQuery = customersQuery.Where(c => c.UpdatedAt >= _lastOperationsSyncUtc.Value);
             settingsQuery = settingsQuery.Where(s => s.UpdatedAt >= _lastOperationsSyncUtc.Value);
+            categoriesQuery = categoriesQuery.Where(cat => cat.UpdatedAt >= _lastOperationsSyncUtc.Value);
+            productsQuery = productsQuery.Where(p => p.UpdatedAt >= _lastOperationsSyncUtc.Value);
         }
 
         var customers = await customersQuery.Take(100).ToListAsync(cancellationToken);
         var shifts = await db.ShiftSessions.AsNoTracking().OrderByDescending(s => s.OpenedAt).Take(25).ToListAsync(cancellationToken);
         var settings = await settingsQuery.ToListAsync(cancellationToken);
+        var categories = await categoriesQuery.Take(50).ToListAsync(cancellationToken);
+        var products = await productsQuery.Take(250).ToListAsync(cancellationToken);
 
-        if (!unsyncedLogs.Any() && !customers.Any() && !shifts.Any() && !settings.Any())
+        if (!unsyncedLogs.Any() && !customers.Any() && !shifts.Any() && !settings.Any() && !categories.Any() && !products.Any())
             return;
 
         try
@@ -268,7 +274,9 @@ public class OutboxSyncService : BackgroundService
                 Customers = customers,
                 ShiftSessions = shifts,
                 AuditLogs = unsyncedLogs,
-                StoreSettings = settings
+                StoreSettings = settings,
+                Categories = categories,
+                Products = products
             };
 
             var resp = await _httpClient.PostAsJsonAsync(
@@ -330,6 +338,9 @@ public class OutboxSyncService : BackgroundService
                 local.Unit = prod.Unit;
                 local.CostPrice = prod.CostPrice;
                 local.Price = prod.Price;
+                local.WholesaleMinQty = prod.WholesaleMinQty;
+                local.WholesaleUnitPrice = prod.WholesaleUnitPrice;
+                local.ExpiryDate = prod.ExpiryDate;
                 local.IsTaxable = prod.IsTaxable;
                 local.Stock = prod.Stock;
                 local.ReorderLevel = prod.ReorderLevel;

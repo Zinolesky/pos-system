@@ -69,6 +69,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
     private readonly ISessionService _sessionService;
     private readonly INavigationService _navigationService;
     private readonly AuthenticationService _authService;
+    private readonly DatabaseMaintenanceService _maintenanceService;
 
     private List<Product> _allProducts = new();
     private TaxRate _activeTaxRate = new() { Name = "VAT", Percentage = 0.075m, IsInclusive = false };
@@ -153,18 +154,26 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
             {
                 CurrentSale.CustomerId = value?.Id;
                 CurrentSale.CustomerName = value?.Name;
+                if (value == null && CurrentSale.LoyaltyPointsRedeemed > 0)
+                {
+                    CurrentSale.LoyaltyPointsRedeemed = 0;
+                    _cartEngine.RecalculateCart(CurrentSale, _activeTaxRate);
+                    RefreshCart();
+                }
                 OnPropertyChanged(nameof(AttachedCustomerText));
             }
         }
     }
 
     public string AttachedCustomerText => SelectedCustomer != null
-        ? $"👤 {SelectedCustomer.Name} ({SelectedCustomer.LoyaltyPoints} pts)"
+        ? $"👤 {SelectedCustomer.Name} ({SelectedCustomer.LoyaltyPoints} pts • Credit: {SelectedCustomer.StoreCreditBalance:C})"
         : "👤 Walk-in Customer";
 
     public string SubtotalText => CurrentSale.Subtotal.ToString("C");
     public string DiscountText => CurrentSale.DiscountAmount > 0
-        ? $"-{CurrentSale.DiscountAmount:C} ({CurrentSale.DiscountPercentage:0.#}%)"
+        ? (CurrentSale.LoyaltyPointsRedeemed > 0
+            ? $"-{CurrentSale.DiscountAmount:C} ({CurrentSale.LoyaltyPointsRedeemed} pts)"
+            : $"-{CurrentSale.DiscountAmount:C} ({CurrentSale.DiscountPercentage:0.#}%)")
         : 0m.ToString("C");
     public string TaxLabelText => _activeTaxRate.DisplayLabel;
     public string TaxText => CurrentSale.TaxAmount.ToString("C");
@@ -297,6 +306,17 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private decimal _storeCreditTenderInput;
+    public decimal StoreCreditTenderInput
+    {
+        get => _storeCreditTenderInput;
+        set
+        {
+            if (SetProperty(ref _storeCreditTenderInput, value))
+                RecalculatePreviewChange();
+        }
+    }
+
     private string _paymentReferenceInput = string.Empty;
     public string PaymentReferenceInput
     {
@@ -304,12 +324,12 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _paymentReferenceInput, value);
     }
 
-    public string PreviewTenderTotalText => (CashTenderInput + CardTenderInput + TransferTenderInput).ToString("C");
+    public string PreviewTenderTotalText => (CashTenderInput + CardTenderInput + TransferTenderInput + StoreCreditTenderInput).ToString("C");
     public string PreviewChangeDueText
     {
         get
         {
-            decimal nonCashApplied = Math.Min(CurrentSale.TotalAmount, CardTenderInput + TransferTenderInput);
+            decimal nonCashApplied = Math.Min(CurrentSale.TotalAmount, CardTenderInput + TransferTenderInput + StoreCreditTenderInput);
             decimal cashBalanceDue = Math.Max(0m, CurrentSale.TotalAmount - nonCashApplied);
             return Math.Max(0m, CashTenderInput - cashBalanceDue).ToString("C");
         }
@@ -482,6 +502,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
     public string TodayProfitText { get; private set; } = 0m.ToString("C");
     public int TodaySalesCount { get; private set; }
     public int LowStockCount => _allProducts.Count(p => p.Stock <= p.ReorderLevel);
+    public int ExpiringSoonCount => _allProducts.Count(p => p.IsExpired || p.IsExpiringSoon);
 
     // Commands
     public ICommand AddProductCommand { get; }
@@ -541,6 +562,10 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
     public ICommand CreateStaffCommand { get; }
     public ICommand ToggleTaxInclusiveCommand { get; }
     public ICommand CycleInventoryPolicyCommand { get; }
+    public ICommand RedeemLoyaltyPointsCommand { get; }
+    public ICommand BackupDatabaseCommand { get; }
+    public ICommand ExportCsvReportsCommand { get; }
+    public ICommand ImportCsvCatalogCommand { get; }
 
     public CheckoutViewModel(
         IServiceProvider serviceProvider,
@@ -556,6 +581,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         _sessionService = sessionService;
         _navigationService = navigationService;
         _authService = authService;
+        _maintenanceService = serviceProvider.GetService<DatabaseMaintenanceService>() ?? new DatabaseMaintenanceService(serviceProvider);
         _cartEngine = new CartExecutionEngine();
 
         AddProductCommand = new RelayCommand(param => AddProduct(param as Product));
@@ -702,6 +728,9 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                     Unit = p.Unit,
                     CostPrice = p.CostPrice,
                     Price = p.Price,
+                    WholesaleMinQty = p.WholesaleMinQty,
+                    WholesaleUnitPrice = p.WholesaleUnitPrice,
+                    ExpiryDate = p.ExpiryDate,
                     Stock = p.Stock,
                     ReorderLevel = p.ReorderLevel,
                     IsTaxable = p.IsTaxable
@@ -714,6 +743,10 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         CreateStaffCommand = new RelayCommand(CreateStaffFromAdmin);
         ToggleTaxInclusiveCommand = new RelayCommand(ToggleTaxInclusiveMode);
         CycleInventoryPolicyCommand = new RelayCommand(CycleInventoryPolicy);
+        RedeemLoyaltyPointsCommand = new RelayCommand(RedeemCustomerLoyaltyPoints);
+        BackupDatabaseCommand = new RelayCommand(() => { _ = RunHotBackup(); });
+        ExportCsvReportsCommand = new RelayCommand(() => { _ = ExportCsvReports(); });
+        ImportCsvCatalogCommand = new RelayCommand(() => { _ = ImportCsvCatalog(); });
 
         LoadDatabaseData();
         LoadActiveShiftFromDatabase();
@@ -780,7 +813,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
             EditableProduct.CategoryId = Categories[1].Id;
         }
 
-        ReplaceCollectionIfChanged(Customers, db.Customers.AsNoTracking().ToList().OrderByDescending(c => c.TotalSpent).ToList(), (a, b) => a.Id == b.Id && a.UpdatedAt == b.UpdatedAt && a.LoyaltyPoints == b.LoyaltyPoints && a.TotalSpent == b.TotalSpent);
+        ReplaceCollectionIfChanged(Customers, db.Customers.AsNoTracking().ToList().OrderByDescending(c => c.TotalSpent).ToList(), (a, b) => a.Id == b.Id && a.UpdatedAt == b.UpdatedAt && a.LoyaltyPoints == b.LoyaltyPoints && a.StoreCreditBalance == b.StoreCreditBalance && a.TotalSpent == b.TotalSpent);
         ReplaceCollectionIfChanged(StaffMembers, db.Cashiers.AsNoTracking().OrderBy(c => c.Username).ToList(), (a, b) => a.Id == b.Id && a.UpdatedAt == b.UpdatedAt);
 
         var suspended = db.Sales
@@ -836,6 +869,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(TodayProfitText));
         OnPropertyChanged(nameof(TodaySalesCount));
         OnPropertyChanged(nameof(LowStockCount));
+        OnPropertyChanged(nameof(ExpiringSoonCount));
         OnPropertyChanged(nameof(TaxLabelText));
         OnPropertyChanged(nameof(HeldSalesBadge));
         RefreshSyncIndicators();
@@ -920,7 +954,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         ReplaceCollectionIfChanged(
             FilteredProducts,
             filtered,
-            (a, b) => a.Id == b.Id && a.Stock == b.Stock && a.Price == b.Price && a.Name == b.Name && a.Sku == b.Sku);
+            (a, b) => a.Id == b.Id && a.Stock == b.Stock && a.Price == b.Price && a.WholesaleMinQty == b.WholesaleMinQty && a.WholesaleUnitPrice == b.WholesaleUnitPrice && a.ExpiryDate == b.ExpiryDate && a.Name == b.Name && a.Sku == b.Sku);
     }
 
     private void ScannerListener_BarcodeScanned(object? sender, string barcode)
@@ -1388,6 +1422,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         CashTenderInput = CurrentSale.TotalAmount;
         CardTenderInput = 0m;
         TransferTenderInput = 0m;
+        StoreCreditTenderInput = 0m;
         PaymentReferenceInput = string.Empty;
         IsPaymentModalOpen = true;
     }
@@ -1400,11 +1435,13 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                 CashTenderInput = CurrentSale.TotalAmount;
                 CardTenderInput = 0m;
                 TransferTenderInput = 0m;
+                StoreCreditTenderInput = 0m;
                 break;
             case PaymentMethod.Card:
                 CashTenderInput = 0m;
                 CardTenderInput = CurrentSale.TotalAmount;
                 TransferTenderInput = 0m;
+                StoreCreditTenderInput = 0m;
                 if (string.IsNullOrWhiteSpace(PaymentReferenceInput))
                     PaymentReferenceInput = $"POS-{DateTime.Now:HHmmss}";
                 break;
@@ -1412,17 +1449,62 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                 CashTenderInput = 0m;
                 CardTenderInput = 0m;
                 TransferTenderInput = CurrentSale.TotalAmount;
+                StoreCreditTenderInput = 0m;
                 if (string.IsNullOrWhiteSpace(PaymentReferenceInput))
                     PaymentReferenceInput = $"TRF-{DateTime.Now:HHmmss}";
+                break;
+            case PaymentMethod.StoreCredit:
+                decimal maxCredit = SelectedCustomer != null
+                    ? Math.Min(CurrentSale.TotalAmount, SelectedCustomer.StoreCreditBalance)
+                    : 0m;
+                StoreCreditTenderInput = maxCredit;
+                CashTenderInput = Math.Max(0m, CurrentSale.TotalAmount - maxCredit);
+                CardTenderInput = 0m;
+                TransferTenderInput = 0m;
+                if (string.IsNullOrWhiteSpace(PaymentReferenceInput))
+                    PaymentReferenceInput = $"CRD-{DateTime.Now:HHmmss}";
                 break;
             case PaymentMethod.Split:
                 decimal half = Math.Round(CurrentSale.TotalAmount / 2m, 2);
                 CashTenderInput = half;
                 CardTenderInput = CurrentSale.TotalAmount - half;
                 TransferTenderInput = 0m;
+                StoreCreditTenderInput = 0m;
                 break;
         }
         RecalculatePreviewChange();
+    }
+
+    public void RedeemCustomerLoyaltyPoints()
+    {
+        if (SelectedCustomer == null || SelectedCustomer.LoyaltyPoints <= 0)
+        {
+            StatusMessage = "⚠️ Attach a customer with available loyalty points first.";
+            return;
+        }
+
+        if (!CurrentSale.Items.Any())
+        {
+            StatusMessage = "⚠️ Add items to the cart before redeeming loyalty points.";
+            return;
+        }
+
+        int maxPtsBySubtotal = (int)Math.Floor(CurrentSale.Subtotal / CartExecutionEngine.LoyaltyPointValueNaira);
+        int ptsToRedeem = Math.Min(SelectedCustomer.LoyaltyPoints, maxPtsBySubtotal);
+        if (ptsToRedeem <= 0)
+        {
+            StatusMessage = "⚠️ Order subtotal is too small for loyalty point redemption.";
+            return;
+        }
+
+        CurrentSale.LoyaltyPointsRedeemed = ptsToRedeem;
+        _cartEngine.RecalculateCart(CurrentSale, _activeTaxRate);
+        RefreshCart();
+        if (IsPaymentModalOpen)
+        {
+            UpdateTenderDefaultAmounts();
+        }
+        StatusMessage = $"🎁 Redeemed {ptsToRedeem} loyalty points (-{(ptsToRedeem * CartExecutionEngine.LoyaltyPointValueNaira):C}) for {SelectedCustomer.Name}.";
     }
 
     private void RecalculatePreviewChange()
@@ -1446,6 +1528,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         CashTenderInput = CurrentSale.TotalAmount;
         CardTenderInput = 0m;
         TransferTenderInput = 0m;
+        StoreCreditTenderInput = 0m;
         PaymentReferenceInput = "EXACT-CASH";
         await FinalizeSalePaymentAsync();
     }
@@ -1455,17 +1538,31 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         if (!EnforceOpenShiftForSale()) return false;
         if (!CurrentSale.Items.Any()) return false;
 
-        if (CashTenderInput < 0m || CardTenderInput < 0m || TransferTenderInput < 0m)
+        if (CashTenderInput < 0m || CardTenderInput < 0m || TransferTenderInput < 0m || StoreCreditTenderInput < 0m)
         {
             StatusMessage = "⚠️ Tender amounts cannot be negative.";
             return false;
         }
 
-        decimal nonCashTender = CardTenderInput + TransferTenderInput;
+        if (StoreCreditTenderInput > 0m)
+        {
+            if (SelectedCustomer == null)
+            {
+                StatusMessage = "⚠️ Attach a registered customer before tendering with Store Credit.";
+                return false;
+            }
+            if (StoreCreditTenderInput > SelectedCustomer.StoreCreditBalance)
+            {
+                StatusMessage = $"⚠️ Store Credit tender ({StoreCreditTenderInput:C}) exceeds {SelectedCustomer.Name}'s available credit ({SelectedCustomer.StoreCreditBalance:C}).";
+                return false;
+            }
+        }
+
+        decimal nonCashTender = CardTenderInput + TransferTenderInput + StoreCreditTenderInput;
         if (nonCashTender > CurrentSale.TotalAmount)
         {
             System.Media.SystemSounds.Exclamation.Play();
-            StatusMessage = $"⚠️ Card + Transfer amount ({nonCashTender:C}) cannot exceed order total ({CurrentSale.TotalAmount:C}). Over-tendering for change is only permitted on Cash.";
+            StatusMessage = $"⚠️ Card + Transfer + Store Credit amount ({nonCashTender:C}) cannot exceed order total ({CurrentSale.TotalAmount:C}). Over-tendering for change is only permitted on Cash.";
             return false;
         }
 
@@ -1511,6 +1608,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
             CurrentSale.CashTendered = CashTenderInput;
             CurrentSale.CardTendered = CardTenderInput;
             CurrentSale.TransferTendered = TransferTenderInput;
+            CurrentSale.StoreCreditTendered = StoreCreditTenderInput;
             CurrentSale.PaymentReference = PaymentReferenceInput;
             CurrentSale.CreatedAt = DateTime.UtcNow;
             CurrentSale.ShiftId = ActiveShift?.Id;
@@ -1552,7 +1650,13 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                 {
                     cust.TotalSpent += CurrentSale.TotalAmount;
                     cust.VisitCount += 1;
-                    cust.LoyaltyPoints += (int)Math.Floor(CurrentSale.TotalAmount / 1000m);
+                    int redeemedPts = Math.Clamp(CurrentSale.LoyaltyPointsRedeemed, 0, cust.LoyaltyPoints);
+                    int earnedPts = (int)Math.Floor(CurrentSale.TotalAmount / 1000m);
+                    cust.LoyaltyPoints = Math.Max(0, cust.LoyaltyPoints - redeemedPts) + earnedPts;
+                    if (CurrentSale.StoreCreditTendered > 0m)
+                    {
+                        cust.StoreCreditBalance = Math.Max(0m, cust.StoreCreditBalance - CurrentSale.StoreCreditTendered);
+                    }
                     cust.UpdatedAt = DateTime.UtcNow;
                 }
             }
@@ -1794,6 +1898,13 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                 cust.TotalSpent = Math.Max(0m, cust.TotalSpent - quote.RefundTotal);
                 int ptsDeduct = (int)Math.Floor(quote.RefundTotal / 1000m);
                 cust.LoyaltyPoints = Math.Max(0, cust.LoyaltyPoints - ptsDeduct);
+                if (dbSale.PaymentMethod == PaymentMethod.StoreCredit || dbSale.StoreCreditTendered > 0m)
+                {
+                    decimal creditRestore = dbSale.StoreCreditTendered > 0m
+                        ? Math.Min(quote.RefundTotal, dbSale.StoreCreditTendered)
+                        : quote.RefundTotal;
+                    cust.StoreCreditBalance += creditRestore;
+                }
                 cust.UpdatedAt = DateTime.UtcNow;
             }
         }
@@ -2113,15 +2224,65 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                     shift.IsClosed = true;
                     db.SaveChanges();
 
+                    string backupNote = string.Empty;
+                    try
+                    {
+                        var backupRes = _maintenanceService.CreateHotBackup("shiftclose");
+                        if (backupRes.Success)
+                        {
+                            backupNote = $" • Backup saved ({Math.Max(1, backupRes.FileSizeBytes / 1024)} KB)";
+                        }
+                    }
+                    catch
+                    {
+                        // Non-blocking if disk is read-only
+                    }
+
                     ActiveShift = shift;
                     _sessionService.SetCurrentShift(null);
                     ReceiptPreviewText = _printerService.PrintZReport(shift);
                     IsReceiptModalOpen = true;
                     LoadDatabaseData();
-                    StatusMessage = $"Shift closed! Z-Report generated. Variance: {(shift.Variance ?? 0m):C}.";
+                    StatusMessage = $"Shift closed! Z-Report generated. Variance: {(shift.Variance ?? 0m):C}{backupNote}.";
                 }
             },
             ActiveShift.Id.ToString());
+    }
+
+    public BackupResult RunHotBackup()
+    {
+        var result = _maintenanceService.CreateHotBackup("manual");
+        if (CurrentUser != null && result.Success)
+        {
+            RecordAuditLog("DatabaseBackup", $"Created SQLite hot backup ({result.BackupFilePath})", CurrentUser, CurrentUser);
+        }
+        LoadDatabaseData();
+        StatusMessage = result.Message;
+        return result;
+    }
+
+    public CsvExportResult ExportCsvReports()
+    {
+        var result = _maintenanceService.ExportAllReportsToCsv();
+        if (CurrentUser != null && result.Success)
+        {
+            RecordAuditLog("CsvExport", $"Exported {result.FilesExported} CSV reports ({result.TotalRowsExported} rows)", CurrentUser, CurrentUser);
+        }
+        LoadDatabaseData();
+        StatusMessage = result.Message;
+        return result;
+    }
+
+    public CsvImportResult ImportCsvCatalog()
+    {
+        var result = _maintenanceService.ImportProductsFromCsv();
+        if (CurrentUser != null && result.Success)
+        {
+            RecordAuditLog("CsvCatalogImport", $"Imported supplier catalog CSV ({result.CreatedCount} created, {result.UpdatedCount} updated)", CurrentUser, CurrentUser);
+        }
+        LoadDatabaseData();
+        StatusMessage = result.Message;
+        return result;
     }
 
     private void SaveProductFromAdmin()
@@ -2150,6 +2311,9 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                 Unit = string.IsNullOrWhiteSpace(EditableProduct.Unit) ? "ea" : EditableProduct.Unit.Trim(),
                 CostPrice = EditableProduct.CostPrice,
                 Price = EditableProduct.Price,
+                WholesaleMinQty = EditableProduct.WholesaleMinQty,
+                WholesaleUnitPrice = EditableProduct.WholesaleUnitPrice,
+                ExpiryDate = EditableProduct.ExpiryDate,
                 Stock = EditableProduct.Stock,
                 ReorderLevel = EditableProduct.ReorderLevel,
                 IsTaxable = EditableProduct.IsTaxable,
@@ -2166,6 +2330,9 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
             existing.Barcode = EditableProduct.Barcode?.Trim();
             existing.CostPrice = EditableProduct.CostPrice;
             existing.Price = EditableProduct.Price;
+            existing.WholesaleMinQty = EditableProduct.WholesaleMinQty;
+            existing.WholesaleUnitPrice = EditableProduct.WholesaleUnitPrice;
+            existing.ExpiryDate = EditableProduct.ExpiryDate;
             existing.Stock = EditableProduct.Stock;
             existing.ReorderLevel = EditableProduct.ReorderLevel;
             existing.IsTaxable = EditableProduct.IsTaxable;

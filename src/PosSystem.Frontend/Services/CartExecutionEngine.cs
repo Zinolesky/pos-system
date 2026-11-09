@@ -16,6 +16,8 @@ public record PartialRefundQuote(
 
 public class CartExecutionEngine
 {
+    public const decimal LoyaltyPointValueNaira = 10m; // 1 loyalty point = ₦10.00 redemption value
+
     public void RecalculateCart(Sale currentSale, TaxRate activeTaxRate)
     {
         currentSale.TaxRatePercentage = activeTaxRate.Percentage;
@@ -27,6 +29,19 @@ public class CartExecutionEngine
         {
             if (item.Quantity < 0) item.Quantity = 0;
 
+            // Automatic Case-Pack / Wholesale Tiered Pricing (unless manually overridden or weighed label)
+            if (!item.MeasuredWeightKg.HasValue && !item.IsManualPriceOverride && item.WholesaleMinQty > 0 && item.WholesaleUnitPrice > 0m)
+            {
+                if (item.Quantity >= item.WholesaleMinQty)
+                {
+                    item.UnitPrice = item.WholesaleUnitPrice;
+                }
+                else if (item.StandardRetailPrice > 0m)
+                {
+                    item.UnitPrice = item.StandardRetailPrice;
+                }
+            }
+
             var grossLine = Math.Round(item.UnitPrice * item.Quantity, 2, MidpointRounding.AwayFromZero);
             var clampedLineDiscount = Math.Clamp(item.LineDiscountAmount, 0m, grossLine);
             item.LineDiscountAmount = clampedLineDiscount;
@@ -37,11 +52,17 @@ public class CartExecutionEngine
 
         currentSale.Subtotal = Math.Round(rawSubtotal, 2, MidpointRounding.AwayFromZero);
 
+        decimal loyaltyDiscount = Math.Max(0m, currentSale.LoyaltyPointsRedeemed * LoyaltyPointValueNaira);
         if (currentSale.DiscountPercentage > 0m)
         {
             var pct = Math.Clamp(currentSale.DiscountPercentage, 0m, 100m);
             currentSale.DiscountPercentage = pct;
-            currentSale.DiscountAmount = Math.Round(currentSale.Subtotal * (pct / 100m), 2, MidpointRounding.AwayFromZero);
+            decimal pctDisc = Math.Round(currentSale.Subtotal * (pct / 100m), 2, MidpointRounding.AwayFromZero);
+            currentSale.DiscountAmount = Math.Clamp(pctDisc + loyaltyDiscount, 0m, currentSale.Subtotal);
+        }
+        else if (currentSale.LoyaltyPointsRedeemed > 0)
+        {
+            currentSale.DiscountAmount = Math.Clamp(loyaltyDiscount, 0m, currentSale.Subtotal);
         }
         else
         {
@@ -92,10 +113,11 @@ public class CartExecutionEngine
             ? Math.Round(netAfterDiscount, 2, MidpointRounding.AwayFromZero)
             : Math.Round(netAfterDiscount + currentSale.TaxAmount, 2, MidpointRounding.AwayFromZero);
 
-        currentSale.AmountTendered = currentSale.CashTendered + currentSale.CardTendered + currentSale.TransferTendered;
+        decimal nonCashTotal = currentSale.CardTendered + currentSale.TransferTendered + currentSale.StoreCreditTendered;
+        currentSale.AmountTendered = currentSale.CashTendered + nonCashTotal;
 
         // Change due can only be dispensed in cash against the cash balance remaining after non-cash tenders
-        decimal nonCashApplied = Math.Min(currentSale.TotalAmount, currentSale.CardTendered + currentSale.TransferTendered);
+        decimal nonCashApplied = Math.Min(currentSale.TotalAmount, nonCashTotal);
         decimal cashBalanceDue = Math.Max(0m, currentSale.TotalAmount - nonCashApplied);
         currentSale.ChangeDue = Math.Max(0m, Math.Round(currentSale.CashTendered - cashBalanceDue, 2, MidpointRounding.AwayFromZero));
     }
@@ -106,12 +128,15 @@ public class CartExecutionEngine
 
         var existingItem = currentSale.Items.FirstOrDefault(i =>
             i.ProductId == product.Id &&
-            i.UnitPrice == product.Price &&
+            !i.IsManualPriceOverride &&
             !i.MeasuredWeightKg.HasValue);
 
         if (existingItem != null)
         {
             existingItem.Quantity += quantity;
+            existingItem.StandardRetailPrice = product.Price;
+            existingItem.WholesaleMinQty = product.WholesaleMinQty;
+            existingItem.WholesaleUnitPrice = product.WholesaleUnitPrice;
             if (negativeStockAuthorized)
                 existingItem.IsNegativeStockAuthorized = true;
         }
@@ -126,6 +151,9 @@ public class CartExecutionEngine
                 Sku = product.Sku,
                 Quantity = quantity,
                 UnitPrice = product.Price,
+                StandardRetailPrice = product.Price,
+                WholesaleMinQty = product.WholesaleMinQty,
+                WholesaleUnitPrice = product.WholesaleUnitPrice,
                 CostPrice = product.CostPrice,
                 IsTaxable = product.IsTaxable,
                 IsNegativeStockAuthorized = negativeStockAuthorized
@@ -147,6 +175,7 @@ public class CartExecutionEngine
             Quantity = 1,
             MeasuredWeightKg = match.WeightKg,
             UnitPrice = match.CalculatedUnitPrice,
+            StandardRetailPrice = match.CalculatedUnitPrice,
             CostPrice = match.CalculatedCostPrice,
             IsTaxable = match.Product.IsTaxable,
             IsNegativeStockAuthorized = negativeStockAuthorized
@@ -172,6 +201,7 @@ public class CartExecutionEngine
     public void ApplyItemPriceOverride(Sale currentSale, SaleLineItem item, decimal newUnitPrice, TaxRate activeTaxRate)
     {
         if (newUnitPrice < 0m) newUnitPrice = 0m;
+        item.IsManualPriceOverride = true;
         item.UnitPrice = Math.Round(newUnitPrice, 2, MidpointRounding.AwayFromZero);
         RecalculateCart(currentSale, activeTaxRate);
     }

@@ -58,6 +58,8 @@ public class SyncSalesResponse
 
 public class SyncOperationsRequest
 {
+    public List<Category> Categories { get; set; } = new();
+    public List<Product> Products { get; set; } = new();
     public List<Customer> Customers { get; set; } = new();
     public List<ShiftSession> ShiftSessions { get; set; } = new();
     public List<AuditLog> AuditLogs { get; set; } = new();
@@ -66,6 +68,8 @@ public class SyncOperationsRequest
 
 public class SyncOperationsResponse
 {
+    public int SyncedCategories { get; set; }
+    public int SyncedProducts { get; set; }
     public int SyncedCustomers { get; set; }
     public int SyncedShifts { get; set; }
     public int SyncedAuditLogs { get; set; }

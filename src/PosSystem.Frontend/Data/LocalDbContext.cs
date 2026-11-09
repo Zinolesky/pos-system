@@ -12,7 +12,7 @@ namespace PosSystem.Frontend.Data;
 
 public class LocalDbContext : DbContext
 {
-    public const string CurrentSchemaVersion = "2.2";
+    public const string CurrentSchemaVersion = "2.3";
     public const string SchemaVersionSettingKey = "LocalSqliteSchemaVersion";
 
     public static string GetDatabasePath()
@@ -210,9 +210,14 @@ public class LocalDbContext : DbContext
             CREATE INDEX IF NOT EXISTS ""IX_Sales_Status"" ON ""Sales"" (""Status"");
         ");
 
-        // Explicit column upgrades for Sales & SaleLineItems
+        // Explicit column upgrades for Products, Sales & SaleLineItems
+        EnsureColumnExists("Products", "WholesaleMinQty", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumnExists("Products", "WholesaleUnitPrice", "TEXT NOT NULL DEFAULT '0.0'");
+        EnsureColumnExists("Products", "ExpiryDate", "TEXT NULL");
         EnsureColumnExists("Sales", "IsTaxInclusive", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumnExists("Sales", "RefundedAmount", "TEXT NOT NULL DEFAULT '0.0'");
+        EnsureColumnExists("Sales", "LoyaltyPointsRedeemed", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumnExists("Sales", "StoreCreditTendered", "TEXT NOT NULL DEFAULT '0.0'");
         EnsureColumnExists("Sales", "OriginalSaleId", "TEXT NULL");
         EnsureColumnExists("Sales", "Notes", "TEXT NULL");
         EnsureColumnExists("SaleLineItems", "MeasuredWeightKg", "TEXT NULL");
