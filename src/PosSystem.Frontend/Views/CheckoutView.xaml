@@ -11,12 +11,26 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="BtnBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}" RenderTransformOrigin="0.5,0.5">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#FDE047"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#F59E0B"/>
+                                <Setter TargetName="BtnBorder" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.96" ScaleY="0.96"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -24,19 +38,30 @@
 
         <Style x:Key="NavButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#cbd5e1"/>
+            <Setter Property="Foreground" Value="#94a3b8"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="4,1,1,1"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Height" Value="42"/>
+            <Setter Property="Height" Value="44"/>
             <Setter Property="Margin" Value="12,3"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="16,0">
+                        <Border x:Name="NavBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="14,0">
                             <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="NavBorder" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -52,9 +77,23 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="5" Margin="2">
+                        <Border x:Name="NumBorder" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="5" Margin="2" RenderTransformOrigin="0.5,0.5">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="NumBorder" Property="BorderBrush" Value="#FBBF24"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="NumBorder" Property="Background" Value="#334155"/>
+                                <Setter TargetName="NumBorder" Property="BorderBrush" Value="#4ade80"/>
+                                <Setter TargetName="NumBorder" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.94" ScaleY="0.94"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -65,15 +104,76 @@
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="18,8"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="BorderBrush" Value="#334155"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18" Padding="{TemplateBinding Padding}" Margin="0,0,8,0">
+                        <Border x:Name="PillBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18" Padding="{TemplateBinding Padding}" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PillBorder" Property="Background" Value="#26354D"/>
+                                <Setter TargetName="PillBorder" Property="BorderBrush" Value="#FBBF24"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="PillBorder" Property="Background" Value="#292112"/>
+                                <Setter TargetName="PillBorder" Property="BorderBrush" Value="#4ade80"/>
+                                <Setter TargetName="PillBorder" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.94" ScaleY="0.94"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ProductCardButton" TargetType="Button">
+            <Setter Property="Background" Value="#1e293b"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CardBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Width="170"
+                                Height="165"
+                                Padding="12"
+                                RenderTransformOrigin="0.5,0.5">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#26354D"/>
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#FBBF24"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#14332B"/>
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#4ADE80"/>
+                                <Setter TargetName="CardBorder" Property="BorderThickness" Value="2"/>
+                                <Setter TargetName="CardBorder" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.94" ScaleY="0.94"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#0F172A"/>
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#7F1D1D"/>
+                                <Setter TargetName="CardBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -118,11 +218,21 @@
             <Button Grid.Row="2" Content="{Binding HeldSalesBadge}" Background="#1e293b" Foreground="#38bdf8" FontWeight="SemiBold" Margin="16,0,16,14" Height="36" BorderThickness="0" Command="{Binding HoldOrRecallSaleCommand}"/>
 
             <StackPanel Grid.Row="3" Margin="0,4,0,0">
-                <Button Content="🛒  POS Register" Style="{StaticResource NavButton}" Command="{Binding SwitchSectionCommand}" CommandParameter="Register"/>
-                <Button Content="🧾  Transactions &amp; Refunds" Style="{StaticResource NavButton}" Command="{Binding SwitchSectionCommand}" CommandParameter="Transactions"/>
-                <Button Content="👥  Customers &amp; Loyalty" Style="{StaticResource NavButton}" Command="{Binding SwitchSectionCommand}" CommandParameter="Customers"/>
-                <Button Content="🏦  Shift Till &amp; Z-Report" Style="{StaticResource NavButton}" Command="{Binding SwitchSectionCommand}" CommandParameter="Shift"/>
-                <Button Content="⚙️  Back-Office Admin" Style="{StaticResource NavButton}" Command="{Binding SwitchSectionCommand}" CommandParameter="Admin"/>
+                <Button Content="🛒  POS Register (F2)" Style="{StaticResource NavButton}"
+                        Background="{Binding RegisterNavBackground}" Foreground="{Binding RegisterNavForeground}" BorderBrush="{Binding RegisterNavBorder}"
+                        Command="{Binding SwitchSectionCommand}" CommandParameter="Register"/>
+                <Button Content="🧾  Transactions &amp; Refunds" Style="{StaticResource NavButton}"
+                        Background="{Binding TransactionsNavBackground}" Foreground="{Binding TransactionsNavForeground}" BorderBrush="{Binding TransactionsNavBorder}"
+                        Command="{Binding SwitchSectionCommand}" CommandParameter="Transactions"/>
+                <Button Content="👥  Customers &amp; Loyalty (F8)" Style="{StaticResource NavButton}"
+                        Background="{Binding CustomersNavBackground}" Foreground="{Binding CustomersNavForeground}" BorderBrush="{Binding CustomersNavBorder}"
+                        Command="{Binding SwitchSectionCommand}" CommandParameter="Customers"/>
+                <Button Content="🏦  Shift Till &amp; Z-Report" Style="{StaticResource NavButton}"
+                        Background="{Binding ShiftNavBackground}" Foreground="{Binding ShiftNavForeground}" BorderBrush="{Binding ShiftNavBorder}"
+                        Command="{Binding SwitchSectionCommand}" CommandParameter="Shift"/>
+                <Button Content="⚙️  Back-Office Admin" Style="{StaticResource NavButton}"
+                        Background="{Binding AdminNavBackground}" Foreground="{Binding AdminNavForeground}" BorderBrush="{Binding AdminNavBorder}"
+                        Command="{Binding SwitchSectionCommand}" CommandParameter="Admin"/>
             </StackPanel>
 
             <StackPanel Grid.Row="4" Margin="0,0,0,20">
@@ -216,29 +326,28 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button Background="Transparent" BorderThickness="0" Margin="5" Cursor="Hand"
+                                <Button Style="{StaticResource ProductCardButton}"
+                                        IsEnabled="{Binding IsInStock}"
                                         Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}">
-                                    <Border Background="#1e293b" BorderBrush="#334155" BorderThickness="1" CornerRadius="8" Width="170" Height="165" Padding="12">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="*"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid Grid.Row="0">
-                                                <TextBlock Text="{Binding Sku}" Foreground="#94a3b8" FontSize="11"/>
-                                                <Border Background="#0f172a" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
-                                                    <TextBlock Text="{Binding StockBadgeText}" Foreground="#38bdf8" FontSize="10" FontWeight="SemiBold"/>
-                                                </Border>
-                                            </Grid>
-                                            <TextBlock Grid.Row="1" Text="{Binding Name}" Foreground="White" TextWrapping="Wrap" FontSize="14" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                                            <Grid Grid.Row="2">
-                                                <TextBlock Text="{Binding Barcode, StringFormat=# {0}}" Foreground="#64748b" FontSize="11" VerticalAlignment="Bottom"/>
-                                                <TextBlock Text="{Binding Price, StringFormat=C}" Foreground="#FBBF24" FontSize="16" FontWeight="Bold" HorizontalAlignment="Right"/>
-                                            </Grid>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid Grid.Row="0">
+                                            <TextBlock Text="{Binding Sku}" Foreground="#94a3b8" FontSize="11"/>
+                                            <Border Background="#0f172a" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding StockBadgeText}" Foreground="{Binding StockBadgeForeground}" FontSize="10" FontWeight="SemiBold"/>
+                                            </Border>
                                         </Grid>
-                                    </Border>
+                                        <TextBlock Grid.Row="1" Text="{Binding Name}" Foreground="White" TextWrapping="Wrap" FontSize="14" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                                        <Grid Grid.Row="2">
+                                            <TextBlock Text="{Binding Barcode, StringFormat=# {0}}" Foreground="#64748b" FontSize="11" VerticalAlignment="Bottom"/>
+                                            <TextBlock Text="{Binding Price, StringFormat=C}" Foreground="#FBBF24" FontSize="16" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </Grid>
                                 </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -623,10 +732,11 @@
                      VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
+                        <Setter Property="Cursor" Value="Hand"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListBoxItem">
-                                    <Border Background="Transparent" Padding="6,8" BorderBrush="#334155" BorderThickness="0,0,0,1">
+                                    <Border x:Name="CartRowBorder" Background="Transparent" Padding="8,8" BorderBrush="#334155" BorderThickness="0,0,0,1" CornerRadius="4">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
@@ -644,16 +754,26 @@
                                                     <TextBlock Text="{Binding UnitPrice, StringFormat=@ {0:C}}" Foreground="#94a3b8" VerticalAlignment="Center" FontSize="12"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                    <Button Content="-" Width="28" Height="24" Background="#334155" Foreground="White" BorderThickness="0" Margin="0,0,4,0"
+                                                    <Button Content="-" Width="28" Height="24" Background="#334155" Foreground="White" BorderThickness="0" Margin="0,0,4,0" Cursor="Hand"
                                                             Command="{Binding DataContext.DecreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"/>
-                                                    <Button Content="+" Width="28" Height="24" Background="#334155" Foreground="White" BorderThickness="0" Margin="0,0,8,0"
+                                                    <Button Content="+" Width="28" Height="24" Background="#334155" Foreground="White" BorderThickness="0" Margin="0,0,8,0" Cursor="Hand"
                                                             Command="{Binding DataContext.IncreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"/>
-                                                    <Button Content="Void" Width="42" Height="24" Background="Transparent" Foreground="#ef4444" BorderBrush="#ef4444" BorderThickness="1"
+                                                    <Button Content="Void" Width="42" Height="24" Background="Transparent" Foreground="#ef4444" BorderBrush="#ef4444" BorderThickness="1" Cursor="Hand"
                                                             Command="{Binding DataContext.VoidItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Grid>
                                     </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="CartRowBorder" Property="Background" Value="#26354D"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="CartRowBorder" Property="Background" Value="#292112"/>
+                                            <Setter TargetName="CartRowBorder" Property="BorderBrush" Value="#FBBF24"/>
+                                            <Setter TargetName="CartRowBorder" Property="BorderThickness" Value="3,0,0,1"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>

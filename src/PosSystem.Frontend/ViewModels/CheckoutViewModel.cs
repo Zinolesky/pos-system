@@ -109,6 +109,21 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(IsCustomersVisible));
                 OnPropertyChanged(nameof(IsShiftVisible));
                 OnPropertyChanged(nameof(IsAdminVisible));
+                OnPropertyChanged(nameof(RegisterNavBackground));
+                OnPropertyChanged(nameof(RegisterNavForeground));
+                OnPropertyChanged(nameof(RegisterNavBorder));
+                OnPropertyChanged(nameof(TransactionsNavBackground));
+                OnPropertyChanged(nameof(TransactionsNavForeground));
+                OnPropertyChanged(nameof(TransactionsNavBorder));
+                OnPropertyChanged(nameof(CustomersNavBackground));
+                OnPropertyChanged(nameof(CustomersNavForeground));
+                OnPropertyChanged(nameof(CustomersNavBorder));
+                OnPropertyChanged(nameof(ShiftNavBackground));
+                OnPropertyChanged(nameof(ShiftNavForeground));
+                OnPropertyChanged(nameof(ShiftNavBorder));
+                OnPropertyChanged(nameof(AdminNavBackground));
+                OnPropertyChanged(nameof(AdminNavForeground));
+                OnPropertyChanged(nameof(AdminNavBorder));
             }
         }
     }
@@ -118,6 +133,27 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
     public Visibility IsCustomersVisible => ActiveSection == "Customers" ? Visibility.Visible : Visibility.Collapsed;
     public Visibility IsShiftVisible => ActiveSection == "Shift" ? Visibility.Visible : Visibility.Collapsed;
     public Visibility IsAdminVisible => ActiveSection == "Admin" ? Visibility.Visible : Visibility.Collapsed;
+
+    // Left Navbar Active Screen Color Indicators
+    public string RegisterNavBackground => ActiveSection == "Register" ? "#292112" : "Transparent";
+    public string RegisterNavForeground => ActiveSection == "Register" ? "#FBBF24" : "#94A3B8";
+    public string RegisterNavBorder => ActiveSection == "Register" ? "#FBBF24" : "Transparent";
+
+    public string TransactionsNavBackground => ActiveSection == "Transactions" ? "#0F2942" : "Transparent";
+    public string TransactionsNavForeground => ActiveSection == "Transactions" ? "#38BDF8" : "#94A3B8";
+    public string TransactionsNavBorder => ActiveSection == "Transactions" ? "#38BDF8" : "Transparent";
+
+    public string CustomersNavBackground => ActiveSection == "Customers" ? "#0D2E22" : "Transparent";
+    public string CustomersNavForeground => ActiveSection == "Customers" ? "#4ADE80" : "#94A3B8";
+    public string CustomersNavBorder => ActiveSection == "Customers" ? "#4ADE80" : "Transparent";
+
+    public string ShiftNavBackground => ActiveSection == "Shift" ? "#241638" : "Transparent";
+    public string ShiftNavForeground => ActiveSection == "Shift" ? "#C084FC" : "#94A3B8";
+    public string ShiftNavBorder => ActiveSection == "Shift" ? "#C084FC" : "Transparent";
+
+    public string AdminNavBackground => ActiveSection == "Admin" ? "#331421" : "Transparent";
+    public string AdminNavForeground => ActiveSection == "Admin" ? "#FB7185" : "#94A3B8";
+    public string AdminNavBorder => ActiveSection == "Admin" ? "#FB7185" : "Transparent";
 
     private Sale _currentSale = new();
     public Sale CurrentSale
@@ -955,6 +991,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
             FilteredProducts,
             filtered,
             (a, b) => a.Id == b.Id && a.Stock == b.Stock && a.Price == b.Price && a.WholesaleMinQty == b.WholesaleMinQty && a.WholesaleUnitPrice == b.WholesaleUnitPrice && a.ExpiryDate == b.ExpiryDate && a.Name == b.Name && a.Sku == b.Sku);
+        SyncProductCartReservations();
     }
 
     private void ScannerListener_BarcodeScanned(object? sender, string barcode)
@@ -1126,6 +1163,7 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
             CartItems.Add(item);
 
         SelectedCartItem = CartItems.FirstOrDefault(i => i.Id == previousSelectedId) ?? CartItems.LastOrDefault();
+        SyncProductCartReservations();
 
         OnPropertyChanged(nameof(SubtotalText));
         OnPropertyChanged(nameof(DiscountText));
@@ -1133,6 +1171,27 @@ public class CheckoutViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(TaxText));
         OnPropertyChanged(nameof(TotalText));
         OnPropertyChanged(nameof(HeldSalesBadge));
+    }
+
+    private void SyncProductCartReservations()
+    {
+        var reservedByProduct = CurrentSale.Items
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(i => i.MeasuredWeightKg.HasValue
+                    ? Math.Max(1, (int)Math.Ceiling(i.MeasuredWeightKg.Value)) * i.Quantity
+                    : i.Quantity));
+
+        foreach (var prod in _allProducts)
+        {
+            prod.ReservedInCart = reservedByProduct.TryGetValue(prod.Id, out int qty) ? qty : 0;
+        }
+
+        foreach (var prod in FilteredProducts)
+        {
+            prod.ReservedInCart = reservedByProduct.TryGetValue(prod.Id, out int qty) ? qty : 0;
+        }
     }
 
     private int GetCurrentCartQtyForProduct(Ulid productId, Ulid? excludeLineId = null)

@@ -11,12 +11,12 @@ $releaseExe = "$PSScriptRoot\src\PosSystem.Frontend\bin\Release\net8.0-windows\P
 $debugExe = "$PSScriptRoot\src\PosSystem.Frontend\bin\Debug\net8.0-windows\PosSystem.Frontend.exe"
 
 if (Test-Path $releaseExe) {
-    Write-Host "Launching Prime Supermarket POS v2.1 (Release Optimized)..." -ForegroundColor Green
+    Write-Host "Launching Prime Supermarket POS v2.2 (Release Optimized)..." -ForegroundColor Green
     Start-Process -FilePath $releaseExe -WorkingDirectory (Split-Path $releaseExe)
 } elseif (Test-Path $debugExe) {
-    Write-Host "Launching Prime Supermarket POS v2.1..." -ForegroundColor Green
+    Write-Host "Launching Prime Supermarket POS v2.2..." -ForegroundColor Green
     Start-Process -FilePath $debugExe -WorkingDirectory (Split-Path $debugExe)
 } else {
-    Write-Host "Building & Launching Prime Supermarket POS v2.1 (Release)..." -ForegroundColor Cyan
+    Write-Host "Building & Launching Prime Supermarket POS v2.2 (Release)..." -ForegroundColor Cyan
     & $dotnetExe run -c Release --project "$PSScriptRoot\src\PosSystem.Frontend\PosSystem.Frontend.csproj"
 }
