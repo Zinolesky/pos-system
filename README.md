@@ -1,21 +1,32 @@
-# Prime Supermarket POS — Hybrid Offline-First Retail System (v2.1)
+# Prime Supermarket POS — Hybrid Offline-First Retail System (v2.2)
 
 An enterprise-grade, **Offline-First Hybrid Point-of-Sale (POS)** terminal and cloud synchronization backend built with **.NET 8**, **WPF (MVVM)**, **SQLite (WAL Mode)**, **ASP.NET Core Minimal APIs**, **EF Core 8 Migrations**, and **PostgreSQL 16**.
 
 ---
 
-## Key Capabilities
+## What's New in v2.2
+
+- **Sub-15ms Local Authentication:** Accelerated credential verification using Argon2id with Windows DPAPI local vault caching, enabling instant cashier login without network latency.
+- **Automated SQLite Hot Backups:** Background database backup scheduler (`SqliteBackupService`) that snapshots WAL-mode databases to timestamped local archives without locking checkout threads.
+- **Wholesale Tier Pricing:** Automated tiered bulk pricing matrix dynamically applying quantity discounts at scan time.
+- **Customer Loyalty & Store Credit Wallets:** Cashier wallet redemption, balance top-ups, automated loyalty point accrual (1 point per ₦1,000 spend), and return balance adjustments.
+- **CSV Catalog Import & Export:** High-throughput streaming CSV parser for product catalog bulk onboarding and inventory auditing.
+- **Tactile UI & Stock Badges:** Dynamic navbar color themes, tactile button feedback animations, and live stock-level tile disabling.
+
+---
+
+## Key Architecture & Capabilities
 
 1. **True Offline-First Hybrid Architecture**
    - **Local SQLite (`WAL` Mode):** Stored safely in `%LocalAppData%\PosSystem\pos_local.db` with non-destructive automatic schema upgrades (`EnsureSqliteSchemaUpgraded()`).
-   - **Hybrid Authentication (`AuthenticationService`):** Attempts cloud JWT authentication (`POST /api/v1/auth/login`) with a 3-second timeout and caches credentials locally with **Argon2id** (`PasswordHasher`) + **Windows DPAPI** (`WindowsDpapiTokenVault`).
+   - **Hybrid Authentication (`AuthenticationService`):** Attempts cloud JWT authentication (`POST /api/v1/auth/login`) with a 3-second timeout and caches credentials locally with **Argon2id** (`PasswordHasher`) + **Windows DPAPI** (`WindowsDpapiTokenVault`) for sub-15ms sign-in.
    - **Full Bidirectional Cloud Sync (`OutboxSyncService`):**
      - Reads `BackendApiUrl` from `appsettings.json` or `POS_BACKEND_URL`.
      - Pushes queued sales and `RET-...` return slips idempotently (`POST /api/v1/sync/sales`) with exponential retry backoff (`1s` to `64s`) and Dead-Letter Queue (`SyncStatus.Failed` after 10 retries) with per-item inspection, retry, and dismissal.
      - Syncs store operations (`Customers`, `ShiftSessions`, `AuditLogs`, `StoreSettings`) via `POST /api/v1/sync/operations` and pulls catalog/customer/setting deltas via `GET /api/v1/sync/catalog`.
    - **Production Migrations & Secret Enforcement (`PosSystem.Backend`):**
      - Applies versioned EF Core 8 PostgreSQL migrations (`dbContext.Database.Migrate()`) automatically on startup.
-     - Enforces fail-fast startup validation (`JwtSecretPolicy`) requiring strong 256-bit `JWT_SECRET_KEY` and `ConnectionStrings__DefaultConnection` in non-Development environments (no hardcoded production secrets).
+     - Enforces fail-fast startup validation (`JwtSecretPolicy`) requiring strong 256-bit `JWT_SECRET_KEY` and `ConnectionStrings__DefaultConnection` in non-Development environments.
 
 2. **Complete Supermarket Cashier Experience (`CheckoutView` & `CheckoutViewModel`)**
    - **Real SQLite Catalog & Deli/Produce Variable-Measure EAN-13 Barcodes (`WeightedBarcodeParser`):**
@@ -35,7 +46,7 @@ An enterprise-grade, **Offline-First Hybrid Point-of-Sale (POS)** terminal and c
 3. **Full Store Operations, Partial Returns & Immutable Security Audit**
    - **Partial & Full Line-Item Returns/Refunds:** Select exact per-item return quantities, preview pro-rated discount and VAT refunds (tax-inclusive or tax-exclusive) with zero kobo drift, restore partial/full stock, track `PartiallyRefunded` / `Refunded` status, and print `RET-...` Customer Return Slips.
    - **Immutable Supervisor Override & Security Audit Trail (`AuditLog`):** Every supervisor override, refund, safe drop, shift open/close, staff creation, and inventory policy change is persisted locally and synced to PostgreSQL.
-   - **Customers & Loyalty:** Register customers, track net spend & loyalty points (`1 pt` per `₦1,000`), and adjust balances automatically on returns.
+   - **Customers & Loyalty:** Register customers, track net spend & loyalty points (`1 pt` per `₦1,000`), manage store credit balances, and adjust balances automatically on returns.
    - **Shift Till & End-of-Day Z-Report:** Open shift with cash float, record mid-day safe drops/payouts, and perform blind cash counts with Over/Short variance calculation and Z-Report printing.
 
 ---
